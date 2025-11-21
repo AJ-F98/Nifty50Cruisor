@@ -21,7 +21,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install yfinance pandas numpy scikit-learn joblib tensorflow
-          pip install pandas-ta      # ← THIS ONE WORKS EVERYWHERE
+          pip install pandas_ta
           pip install --no-deps ta   # optional fallback
 
       - name: Run Full Prediction
