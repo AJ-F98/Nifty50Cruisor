@@ -1,7 +1,7 @@
 yfinance
 pandas
 numpy
-pandas_ta
+pandas-ta
 tensorflow>=2.15
 scikit-learn
 streamlit
