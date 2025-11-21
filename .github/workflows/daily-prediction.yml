@@ -17,12 +17,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install packages (correct pandas-ta install)
+      - name: Install packages (compatible pandas-ta version)
         run: |
           pip install --upgrade pip
-          pip install yfinance pandas numpy scikit-learn joblib tensorflow pandas-ta --quiet
+          pip install yfinance pandas numpy scikit-learn joblib tensorflow --quiet
+          pip install "pandas-ta<0.4.0" --quiet  # ← THIS IS THE MAGIC: Older version for Python 3.11
 
-      - name: Run prediction (your original code)
+      - name: Run prediction (your original code unchanged)
         run: |
           python -c "
           import os; import sys; sys.path.insert(0, '.')
