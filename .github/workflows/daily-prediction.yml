@@ -3,7 +3,7 @@ name: Daily Nifty50 AI Oracle
 
 on:
   schedule:
-    - cron: '0 3 * * *'    # 8:30 AM IST
+    - cron: '0 3 * * *'    # 8:30 AM IST daily
   workflow_dispatch:
 
 jobs:
@@ -17,13 +17,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install packages (compatible pandas-ta version)
+      - name: Install packages (GitHub install for pandas_ta)
         run: |
           pip install --upgrade pip
           pip install yfinance pandas numpy scikit-learn joblib tensorflow --quiet
-          pip install "pandas-ta<0.4.0" --quiet  # ← THIS IS THE MAGIC: Older version for Python 3.11
+          pip install -U git+https://github.com/twopirllc/pandas-ta.git --quiet  # ← THIS WORKS EVERYWHERE
 
-      - name: Run prediction (your original code unchanged)
+      - name: Run prediction (your original code)
         run: |
           python -c "
           import os; import sys; sys.path.insert(0, '.')
