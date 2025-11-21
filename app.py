@@ -29,7 +29,11 @@ except Exception as e:
 direction, confidence, probs = predict_tomorrow()
 predicted_price = predict_price()
 
-color = {"Bullish": "🟢", "Bearish": "🔴", "Sideways": "⚪"}[direction]
+# Convert numpy types → Python natives
+confidence = float(confidence)
+probs = [float(p) for p in probs]
+
+color = {"Bullish": "green", "Bearish": "red", "Sideways": "gray"}[direction]
 st.markdown(f"### {color} **Tomorrow: {direction.upper()}**")
 st.progress(confidence)
 st.write(f"**Confidence: {confidence:.1%}**")

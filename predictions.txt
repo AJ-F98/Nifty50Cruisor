@@ -1,0 +1,2 @@
+Date,Predicted_Close
+2025-11-21,20941.49
