@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 from src.predict import predict_tomorrow, predict_next_close
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -31,28 +31,27 @@ except Exception as e:
 direction, confidence, probs = predict_tomorrow()
 predicted_price = predict_next_close()
 
-# Convert numpy types → Python natives
+# Convert numpy → Python
 confidence = float(confidence)
 probs = [float(p) for p in probs]
 
 color = {"Bullish": "green", "Bearish": "red", "Sideways": "gray"}[direction]
-st.markdown(f"### {color} **Tomorrow: {direction.upper()}**")
+st.markdown(f"### <span style='color:{color}'>**Tomorrow: {direction.upper()}**</span>", unsafe_allow_html=True)
 st.progress(confidence)
 st.write(f"**Confidence: {confidence:.1%}**")
 
-st.markdown(f"### **Predicted Close: ₹{predicted_price:,.2f}**")
+st.markdown(f"### **Predicted Tomorrow's Close: ₹{predicted_price:,.2f}**")
 
 col1, col2, col3 = st.columns(3)
-col1.metric("Bullish ↑", f"{probs[1]:.1%}")
-col2.metric("Bearish ↓", f"{probs[2]:.1%}")
-col3.metric("Sideways →", f"{probs[0]:.1%}")
+col1.metric("Bullish", f"{probs[1]:.1%}")
+col2.metric("Bearish", f"{probs[2]:.1%}")
+col3.metric("Sideways", f"{probs[0]:.1%}")
 
 # 3. Save Prediction
 prediction_file = "predictions.txt"
 today_str = datetime.now().strftime('%Y-%m-%d')
 log_entry = f"{today_str},{predicted_price:.2f}\n"
 
-# Check if today's prediction is already saved to avoid duplicates
 if os.path.exists(prediction_file):
     with open(prediction_file, "r") as f:
         lines = f.readlines()
@@ -64,48 +63,67 @@ else:
         f.write("Date,Predicted_Close\n")
         f.write(log_entry)
 
-# 4. History Table (Last 5 Days)
-st.subheader("Last 5 Days Performance")
+# 4. CORRECTED: Next-Day Prediction Accuracy Table (t → t+1)
+st.subheader("Next-Day Prediction Accuracy")
+
 try:
-    # Get actual history
-    history = yf.download("^NSEI", period="10d", progress=False)
-    if isinstance(history.columns, pd.MultiIndex):
-        history.columns = history.columns.get_level_values(0)
-    
-    history = history.reset_index().sort_values('Date', ascending=False).head(5)
-    history['Date'] = history['Date'].dt.strftime('%Y-%m-%d')
-    
-    # Get predicted history
+    # Load all predictions
     preds = {}
     if os.path.exists(prediction_file):
         with open(prediction_file, "r") as f:
-            for line in f.readlines()[1:]: # Skip header
+            for line in f.readlines()[1:]:
                 parts = line.strip().split(',')
-                if len(parts) == 2:
+                if len(parts) >= 2:
                     preds[parts[0]] = float(parts[1])
-    
-    # Combine
+
+    # Get recent actual closes
+    history = yf.download("^NSEI", period="20d", progress=False)
+    if isinstance(history.columns, pd.MultiIndex):
+        history.columns = history.columns.get_level_values(0)
+    closes = history['Close'].dropna()
+    closes.index = pd.to_datetime(closes.index)
+
     data = []
-    for _, row in history.iterrows():
-        date = row['Date']
-        actual = row['Close']
-        predicted = preds.get(date, None)
-        diff = actual - predicted if predicted else None
-        data.append({
-            "Date": date,
-            "Actual Close": f"₹{actual:,.2f}",
-            "Predicted Close": f"₹{predicted:,.2f}" if predicted else "N/A",
-            "Difference": f"₹{diff:,.2f}" if diff else "N/A"
-        })
-        
-    st.table(pd.DataFrame(data))
+    errors = []
+
+    for i in range(len(closes) - 1):
+        pred_date = closes.index[i].strftime('%Y-%m-%d')
+        actual_date = closes.index[i+1].strftime('%Y-%m-%d')
+        actual_close = closes.iloc[i+1]
+        predicted = preds.get(pred_date)
+
+        if predicted is not None:
+            diff = actual_close - predicted
+            errors.append(abs(diff))
+            color = "🟢" if abs(diff) <= 50 else "🟡" if abs(diff) <= 100 else "🔴"
+            data.append({
+                "Prediction Made": pred_date,
+                "For Day": actual_date,
+                "Predicted": f"₹{predicted:,.0f}",
+                "Actual": f"₹{actual_close:,.0f}",
+                "Error": f"{color} {diff:+,.0f}"
+            })
+
+    if data:
+        df = pd.DataFrame(data).head(10)
+        st.table(df)
+
+        mae = sum(errors) / len(errors) if errors else 0
+        win_rate = sum(1 for e in errors if e <= 75) / len(errors) * 100 if errors else 0
+
+        col1, col2 = st.columns(2)
+        col1.success(f"**Average Error (MAE): ₹{mae:,.0f}**")
+        col2.success(f"**Win Rate (±0.75%): {win_rate:.1f}%**")
+    else:
+        st.info("Waiting for first next-day result...")
 
 except Exception as e:
-    st.error(f"Error loading history: {e}")
+    st.error(f"Error loading accuracy table: {e}")
 
 # Chart
+st.subheader("Nifty50 - 3 Month Trend")
 chart_data = yf.download("^NSEI", period="3mo", progress=False)['Close']
 st.line_chart(chart_data)
 
-st.caption(f"Last updated: {datetime.now().strftime('%b %d, %Y %I:%M %p')}")
-st.info("Model Accuracy: ~63%+ on unseen data | Threshold: ±0.75%")
+st.caption(f"Last updated: {datetime.now().strftime('%b %d, %Y • %I:%M %p')}")
+st.info("Model: Bi-LSTM Return Predictor + Direction Classifier | Threshold: ±0.75% | Live since Nov 2025")
