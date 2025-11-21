@@ -1,0 +1,59 @@
+# .github/workflows/daily-prediction.yml
+name: Daily Nifty50 Prediction
+
+on:
+  schedule:
+    # Runs every day at 8:30 AM IST = 3:00 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:  # Allows manual run from GitHub
+
+jobs:
+  predict-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance pandas numpy pandas_ta tensorflow scikit-learn joblib --quiet
+
+      - name: Generate today's prediction
+        run: |
+          python -c "
+          from datetime import datetime
+          from src.predict import predict_next_close
+          
+          try:
+              pred = predict_next_close()
+              today = datetime.now().strftime('%Y-%m-%d')
+              line = f'{today},{pred:.2f}\n'
+              
+              file_path = 'predictions.txt'
+              content = open(file_path, 'a+', encoding='utf-8')
+              content.seek(0)
+              if today not in content.read():
+                  content.write(line)
+                  print(f'New prediction → {today}: ₹{pred:.2f}')
+              else:
+                  print('Today\'s prediction already exists')
+              content.close()
+          except Exception as e:
+              print(f'Prediction failed: {e}')
+          "
+
+      - name: Commit and push if changed
+        run: |
+          git config --global user.name "Nifty50 AI Bot"
+          git config --global user.email "nifty50@bot.com"
+          git add predictions.txt
+          git commit -m "Daily prediction update $(date '+%Y-%m-%d')" || echo "No changes to commit"
+          git push || echo "Push failed or no changes"
