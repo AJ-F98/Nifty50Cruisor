@@ -17,12 +17,12 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install correct packages
+      - name: Install packages (correct pandas-ta install)
         run: |
           pip install --upgrade pip
-          pip install yfinance pandas numpy scikit-learn joblib tensorflow pandas_ta
+          pip install yfinance pandas numpy scikit-learn joblib tensorflow pandas-ta --quiet
 
-      - name: Run prediction
+      - name: Run prediction (your original code)
         run: |
           python -c "
           import os; import sys; sys.path.insert(0, '.')
