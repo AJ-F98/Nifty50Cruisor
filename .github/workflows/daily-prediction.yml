@@ -13,17 +13,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Python 3.11
+      - name: Setup Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
-      - name: Install dependencies (GUARANTEED WORKING)
+      - name: Install dependencies
         run: |
           pip install --upgrade pip
+          # Pin numpy<2.0 for compatibility with pandas-ta and tensorflow
           pip install "numpy<2.0" yfinance pandas scikit-learn joblib tensorflow --quiet
-          # THIS IS THE ONLY LINE THAT WORKS ON PYTHON 3.11 + GITHUB ACTIONS
-          pip install "pandas-ta==0.3.14b0" --quiet
+          # Install pandas-ta from PyPI (requires Python >= 3.12 for newer versions)
+          pip install pandas_ta --quiet
 
       - name: Run prediction
         run: |
