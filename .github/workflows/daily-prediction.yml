@@ -17,12 +17,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies + your exact working pandas-ta
+      - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install yfinance pandas numpy scikit-learn joblib tensorflow --quiet
-          # THIS IS YOUR EXACT VERSION — WORKS ON PYTHON 3.11
-          pip install https://github.com/twopirllc/pandas-ta/releases/download/v0.3.14b/pandas_ta-0.3.14b0.tar.gz --quiet
+          # Pin numpy<2.0 to avoid compatibility issues with pandas-ta/tensorflow
+          pip install "numpy<2.0" yfinance pandas scikit-learn joblib tensorflow --quiet
+          # Install pandas-ta directly from the development branch for best compatibility
+          pip install git+https://github.com/twopirllc/pandas-ta.git@development --quiet
 
       - name: Run prediction
         run: |
