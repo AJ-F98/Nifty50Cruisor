@@ -2,9 +2,11 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
-from src.predict import predict_tomorrow, predict_price
+from src.predict import predict_tomorrow, predict_next_close
 from datetime import datetime, timedelta
 import os
+import logging
+logging.basicConfig(level=logging.INFO)
 
 st.set_page_config(page_title="Nifty50 Predictor", layout="centered")
 
@@ -27,7 +29,7 @@ except Exception as e:
 
 # 2. Predictions
 direction, confidence, probs = predict_tomorrow()
-predicted_price = predict_price()
+predicted_price = predict_next_close()
 
 # Convert numpy types → Python natives
 confidence = float(confidence)

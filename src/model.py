@@ -27,5 +27,5 @@ def build_price_model(input_shape):
         Dense(32, activation='relu'),
         Dense(1, activation='linear')
     ])
-    model.compile(optimizer='adam', loss='mse', metrics=['mean_absolute_error'])
+    model.compile(optimizer='adam', loss='mse')
     return model

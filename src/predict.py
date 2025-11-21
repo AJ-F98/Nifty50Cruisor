@@ -53,38 +53,53 @@ def predict_tomorrow():
     mapping = {0: "Sideways", 1: "Bullish", 2: "Bearish"}
     return mapping[pred_class], confidence, prob.tolist()
 
-def predict_price():
-    with open("models/price_features.json") as f:
-        features = json.load(f)
-    scaler = joblib.load("models/price_scaler.pkl")
-    target_scaler = joblib.load("models/target_scaler.pkl")
-    model = tf.keras.models.load_model("models/nifty50_price_lstm.h5", compile=False)
+def predict_next_close():
+    df = None  # Define upfront so it's always in scope
+    try:
+        # Load model stuff
+        with open("models/return_features.json") as f:
+            features = json.load(f)
+        scaler = joblib.load("models/return_scaler.pkl")
+        target_scaler = joblib.load("models/return_target_scaler.pkl")
+        model = tf.keras.models.load_model("models/nifty50_return_lstm.h5")
 
-    # Last 90 days
-    df = yf.download("^NSEI", period="90d", progress=False)
-    vix = yf.download("^INDIAVIX", period="90d", progress=False)
-    
-    # Handle MultiIndex columns if present
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    if isinstance(vix.columns, pd.MultiIndex):
-        vix.columns = vix.columns.get_level_values(0)
+        # Download data
+        df = yf.download("^NSEI", period="100d", progress=False, auto_adjust=True)
+        vix = yf.download("^INDIAVIX", period="100d", progress=False)
 
-    if 'Close' in vix.columns:
-        df['VIX_Close'] = vix['Close']
-    else:
-        df['VIX_Close'] = 0
+        # Flatten columns
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        if isinstance(vix.columns, pd.MultiIndex):
+            vix.columns = vix.columns.get_level_values(0)
 
-    df = df.reset_index()
-    df = engineer_features(df).dropna()
+        df['VIX_Close'] = vix['Close'].reindex(df.index).fillna(method='ffill').fillna(15.0)
+        df = df.reset_index()
+        df = engineer_features(df).dropna()
 
-    if df.empty:
-        return 0.0
+        if len(df) < 35:
+            raise ValueError("Not enough clean data")
 
-    seq = scaler.transform(df[features].tail(30))
-    seq = seq.reshape(1, 30, -1)
+        # Final sequence
+        seq = scaler.transform(df[features].tail(30))
+        seq = seq.reshape(1, 30, -1)
 
-    pred_scaled = model.predict(seq, verbose=0)
-    pred_price = target_scaler.inverse_transform(pred_scaled)[0][0]
-    
-    return float(pred_price)
+        pred_scaled = model.predict(seq, verbose=0)
+        pred_return = target_scaler.inverse_transform(pred_scaled)[0][0]
+
+        today_close = float(df['Close'].iloc[-1])
+        predicted_close = today_close * (1 + pred_return)
+
+        print(f"SUCCESS → Today: ₹{today_close:,.2f} | Move: {pred_return*100:+.3f}% | Tomorrow: ₹{predicted_close:,.2f}")
+        return round(predicted_close, 2)
+
+    except Exception as e:
+        print(f"PREDICTION FAILED → Error: {e}")
+        # FALLBACK 1: Use last known close
+        try:
+            last = yf.download("^NSEI", period="2d", progress=False)['Close'].iloc[-1]
+            print(f"Falling back to latest close: ₹{last:,.2f}")
+            return round(float(last), 2)
+        except:
+            print("Total failure — returning 25200 as last resort")
+            return 25200.0
