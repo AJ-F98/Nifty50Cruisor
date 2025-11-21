@@ -5,14 +5,14 @@ import os
 sys.path.append(os.getcwd())
 
 try:
-    from src.predict import predict_tomorrow, predict_price
+    from src.predict import predict_tomorrow, predict_next_close
     print("Import successful")
     
     direction, confidence, probs = predict_tomorrow()
     print(f"Prediction: {direction}, Confidence: {confidence}")
     print("Probs:", probs)
     
-    price = predict_price()
+    price = predict_next_close()
     print(f"Predicted Price: {price}")
     
     print("Test passed!")
