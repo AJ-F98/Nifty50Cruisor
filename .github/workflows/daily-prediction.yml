@@ -3,82 +3,49 @@ name: Daily Nifty50 AI Oracle
 
 on:
   schedule:
-    - cron: '0 3 * * *'    # 8:30 AM IST daily
+    - cron: '0 3 * * *'    # 8:30 AM IST
   workflow_dispatch:
 
 jobs:
-  oracle:
+  run:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.11
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install Core Dependencies
+      - name: Install correct packages
         run: |
           pip install --upgrade pip
-          pip install yfinance pandas numpy scikit-learn joblib tensorflow --quiet
+          pip install yfinance pandas numpy scikit-learn joblib tensorflow pandas_ta
 
-      - name: Install pandas-ta (Compatible Version)
+      - name: Run prediction
         run: |
-          pip install pandas-ta==0.3.14b0 --quiet || echo "Using fallback indicators"
-
-      - name: Run Full Prediction (Direction + Price)
-        run: |
-          python - <<'EOF'
-          import sys
-          import os
-          sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-          
+          python -c "
+          import os; import sys; sys.path.insert(0, '.')
           from datetime import datetime
           from src.predict import predict_tomorrow, predict_next_close
           
-          try:
-              # Get predictions
-              direction, confidence, probs = predict_tomorrow()
-              predicted_price = predict_next_close()
-              
-              # Format output
-              today = datetime.now().strftime('%Y-%m-%d')
-              line = f"{today},{direction},{confidence:.1%},{probs[1]*100:.1f}%,{probs[2]*100:.1f}%,{probs[0]*100:.1f}%,₹{predicted_price:,.2f}\n"
-              
-              # Write to file
-              file = 'predictions.txt'
-              header = "Date,Direction,Confidence,Bullish%,Bearish%,Sideways%,Predicted_Close\n"
-              
-              if not os.path.exists(file) or os.stat(file).st_size == 0:
-                  with open(file, 'w') as f:
-                      f.write(header)
-              
-              with open(file, 'r+') as f:
-                  content = f.read()
-                  if today not in content:
-                      f.write(line)
-                      print(f"ORACLE SUCCESS → {today}")
-                      print(f"   Direction: {direction} ({confidence:.1%})")
-                      print(f"   Price: ₹{predicted_price:,.2f}")
-                      print(f"   Probs: Bull {probs[1]*100:.1f}% | Bear {probs[2]*100:.1f}% | Side {probs[0]*100:.1f}%")
-                  else:
-                      print(f"Already predicted for {today}")
-          except Exception as e:
-              print(f" Oracle failed: {e}")
-              import traceback
-              traceback.print_exc()
-          EOF
+          direction, conf, probs = predict_tomorrow()
+          price = predict_next_close()
+          today = datetime.now().strftime('%Y-%m-%d')
+          line = f'{today},{direction},{conf:.1%},{probs[1]*100:.1f}%,₹{price:,.2f}\n'
+          
+          file = 'predictions.txt'
+          if not open(file, 'a+', encoding='utf-8').read().strip():
+              open(file, 'w').write('Date,Direction,Confidence,Bullish%,Predicted_Close\n')
+          
+          if today not in open(file).read():
+              open(file, 'a').write(line)
+              print(f'ORACLE → {direction} | {conf:.1%} | ₹{price:,.2f}')
+          "
 
-      - name: Commit & Push Updates
+      - name: Commit & Push
         run: |
-          git config --global user.name "Nifty50 Oracle Bot"
-          git config --global user.email "oracle@nifty50.ai"
+          git config --global user.name "Nifty50 Oracle"
           git add predictions.txt
-          if git diff --staged --quiet; then
-              echo "No changes to commit"
-          else
-              git commit -m "Oracle Daily Update $(date '+%Y-%m-%d')"
-              git push
-              echo "Pushed new prediction to live app"
-          fi
+          git commit -m "Oracle Update $(date '+%Y-%m-%d')" || exit 0
+          git push || exit 0
